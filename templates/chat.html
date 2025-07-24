@@ -102,15 +102,23 @@
       text-align: left;
       color: #198754;
     }
+	#loading-spinner {
+	  display: none;
+	  text-align: center;
+	  padding: 1rem;
+	}	
   </style>
 </head>
 <body>
   <div id="chat-container" class="container-fluid"></div>
-<div id="suggested-prompts" class="container-fluid p-2">
-  <button class="btn btn-outline-secondary m-1 prompt-btn">What's the weather like today?</button>
-  <button class="btn btn-outline-secondary m-1 prompt-btn">Summarise this document</button>
-  <button class="btn btn-outline-secondary m-1 prompt-btn">Explain AI in simple terms</button>
-</div>
+  <div id="loading-spinner">
+    <div class="spinner-border text-success" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+  </div>
+  <div id="suggested-prompts" class="container-fluid p-2">
+    <!-- Buttons will be inserted here dynamically -->
+  </div>
   <div id="input-container" class="container-fluid">
     <input type="text" id="user-input" class="form-control" placeholder="Type your message..." />
     <button id="send-button" class="btn btn-primary">Send</button>
@@ -123,6 +131,7 @@
     const chatContainer = document.getElementById('chat-container');
     const userInput = document.getElementById('user-input');
     const sendButton = document.getElementById('send-button');
+	const spinner = document.getElementById('loading-spinner');
 
     function appendMessage(text, sender) {
       const messageDiv = document.createElement('div');
@@ -142,6 +151,7 @@
 
       appendMessage(prompt, 'user');
       userInput.value = '';
+	  spinner.style.display = 'block';
 
       try {
         const response = await fetch(`${endpoint}/openai/deployments/${model}/chat/completions?api-version=2025-01-01-preview`, {
@@ -162,6 +172,8 @@
 
       } catch (error) {
         appendMessage('Error: ' + error.message, 'bot');
+      } finally {
+        spinner.style.display = 'none';
       }
     }
 
@@ -169,12 +181,37 @@
     userInput.addEventListener('keypress', e => {
       if (e.key === 'Enter') sendMessage();
     });
-document.querySelectorAll('.prompt-btn').forEach(button => {
-  button.addEventListener('click', () => {
-    userInput.value = button.textContent;
-    sendMessage(); // Optional: remove this line if you want to just fill the input without sending
-  });
-});
+	document.querySelectorAll('.prompt-btn').forEach(button => {
+	  button.addEventListener('click', () => {
+		userInput.value = button.textContent;
+		sendMessage(); // Optional: remove this line if you want to just fill the input without sending
+	  });
+	});
+
+	async function loadPrompts() {
+	  try {
+		const response = await fetch('/static/prompts.json'); // Adjust path as needed
+		const prompts = await response.json();
+
+		const container = document.getElementById('suggested-prompts');
+		container.innerHTML = ''; // Clear existing buttons
+
+		prompts.forEach(({ display, prompt }) => {
+		  const button = document.createElement('button');
+		  button.className = 'btn btn-outline-secondary m-1 prompt-btn';
+		  button.textContent = display;
+		  button.addEventListener('click', () => {
+			userInput.value = prompt;
+			sendMessage(); // Optional: remove if you only want to fill the input
+		  });
+		  container.appendChild(button);
+		});
+	  } catch (error) {
+		console.error('Failed to load prompts:', error);
+	  }
+	}
+
+	window.addEventListener('DOMContentLoaded', loadPrompts);
   </script>
 </body>
 </html>
