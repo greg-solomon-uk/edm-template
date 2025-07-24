@@ -1,4 +1,5 @@
-fastapi
-uvicorn
+flask
+gunicorn
 jinja2
+python-dotenv
 python-multipart
