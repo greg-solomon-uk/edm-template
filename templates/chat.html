@@ -132,6 +132,7 @@
     const userInput = document.getElementById('user-input');
     const sendButton = document.getElementById('send-button');
 	const spinner = document.getElementById('loading-spinner');
+    const conversationHistory = [];
 
     function appendMessage(text, sender) {
       const messageDiv = document.createElement('div');
@@ -145,37 +146,39 @@
       chatContainer.scrollTop = chatContainer.scrollHeight;
     }
 
-    async function sendMessage() {
-      const prompt = userInput.value.trim();
-      if (!prompt) return;
+	async function sendMessage() {
+	  const prompt = userInput.value.trim();
+	  if (!prompt) return;
 
-      appendMessage(prompt, 'user');
-      userInput.value = '';
+	  appendMessage(prompt, 'user');
+	  conversationHistory.push({ role: 'user', content: prompt });
+	  userInput.value = '';
 	  spinner.style.display = 'block';
 
-      try {
-        const response = await fetch(`${endpoint}/openai/deployments/${model}/chat/completions?api-version=2025-01-01-preview`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'api-key': apiKey
-          },
-          body: JSON.stringify({
-            messages: [{ role: 'user', content: prompt }],
-            temperature: 0.7
-          })
-        });
+	  try {
+		const response = await fetch(`${endpoint}/openai/deployments/${model}/chat/completions?api-version=2025-01-01-preview`, {
+		  method: 'POST',
+		  headers: {
+			'Content-Type': 'application/json',
+			'api-key': apiKey
+		  },
+		  body: JSON.stringify({
+			messages: conversationHistory,
+			temperature: 0.7
+		  })
+		});
 
-        const data = await response.json();
-        const reply = data.choices?.[0]?.message?.content || 'No response';
-        appendMessage(reply, 'bot');
+		const data = await response.json();
+		const reply = data.choices?.[0]?.message?.content || 'No response';
+		appendMessage(reply, 'bot');
+		conversationHistory.push({ role: 'assistant', content: reply });
 
-      } catch (error) {
-        appendMessage('Error: ' + error.message, 'bot');
-      } finally {
-        spinner.style.display = 'none';
-      }
-    }
+	  } catch (error) {
+		appendMessage('Error: ' + error.message, 'bot');
+	  } finally {
+		spinner.style.display = 'none';
+	  }
+	}
 
     sendButton.addEventListener('click', sendMessage);
     userInput.addEventListener('keypress', e => {
