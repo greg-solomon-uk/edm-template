@@ -1,0 +1,11 @@
+- display: "Quick Summary"
+  prompt: "Explain EDM Data Management using bullet points and drilldown"
+
+- display: "Quiz Me"
+  prompt: "Test my EDM Data Management knowledge and fill in the gaps"
+
+- display: "Coach Me"
+  prompt: "Help me to apply EDM Data Management to a specific goal"
+
+- display: "Design a Solution"
+  prompt: "Help me to learn EDM Data Management by building solutions"
