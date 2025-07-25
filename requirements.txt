@@ -3,3 +3,5 @@ gunicorn
 jinja2
 python-dotenv
 python-multipart
+azure-identity
+azure-keyvault-secrets
