@@ -1,33 +1,252 @@
 <!doctype html>
 <html lang="en">
-<meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
-
 <head>
-  <title>Hello Azure - Python Quickstart</title>
-  <link rel="stylesheet" href="{{ url_for('static', path='bootstrap/css/bootstrap.min.css') }}">
-  <link rel="shortcut icon" href="{{ url_for('static', path='favicon.ico') }}">
+  <meta charset="UTF-8">
+  <title>EDM Quickstart</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/x-icon" href="/static/images/star.ico">
+  <link rel="stylesheet" href="/static/bootstrap/css/bootstrap.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.5/dist/purify.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
+  <style>
+    body, html { height: 100%; margin: 0; display: flex; flex-direction: column; }
+    #chat-container { flex: 1; overflow-y: auto; padding: 1rem; background-color: #f8f9fa; }
+    #input-container { display: flex; padding: 1rem; border-top: 1px solid #ccc; background-color: #fff; }
+    #user-input { flex: 1; margin-right: 1rem; }
+    .message { margin-bottom: 1rem; }
+    .message.bot { text-align: left; color: #198754; font-family: system-ui, sans-serif; line-height: 1.6; }
+    .message.bot :where(h1, h2, h3, h4, h5, h6) { margin-top: 0.4rem; margin-bottom: 0.2rem; font-size: 1rem;  font-weight: 600; }
+    .message.bot p { margin: 0.5rem 0; }
+    .message.bot ul, .message.bot ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+    .message.bot li { margin-bottom: 0.25rem; }
+    .message.bot a { color: #0d6efd; text-decoration: underline; }
+    .message.bot em { font-style: italic; }
+    .message.bot strong { font-weight: bold; }
+    .message.bot pre { background-color: #f1f1f1; padding: 0.75rem; border-radius: 4px; 
+	                   overflow-x: auto; font-family: monospace; white-space: pre-wrap; word-wrap: -word; }
+    .message bot code { background-color: #e9ecef; padding: 0.2rem 0.4rem; border-radius: 4px; font-family: monospace; }
+	.message.bot .two-column { column-count: 2; column-gap: 2rem; }
+	.message.bot .two-column > * { margin-bottom: 1rem; }
+	.message.bot strong { cursor: pointer; text-decoration: underline; color: #198754; }
+    .user { text-align: center; font-weight: bold; color: #0d6efd; background-color: #c9cccf;
+            width: 100%; padding: 1rem; box-sizing: border-box; border: 2px solid #000; }
+    .bot { text-align: left; color: #198754; }
+    #loading-spinner { display: none; text-align: center; padding: 1rem; }
+    .clickable-phrase { font-weight: bold; text-decoration: underline; cursor: pointer; color: #198754; }
+    #suggested-prompts {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 60vh;
+    }
+    .prompt-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 2.5rem;
+      width: 900px;
+      max-width: 98vw;
+      margin: 0 auto;
+    }
+    .prompt-btn {
+      font-size: 1.2rem;
+      width: '25%' !important;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      border-radius: 32px;
+      box-shadow: 0 4px 24px #0002;
+      text-align: center;
+      transition: background 0.2s;
+      background: #fff;
+      padding: 1rem 1rem;
+      white-space: normal;
+      word-break: break-word;
+    }
+    .prompt-btn strong {
+      font-size: 1.2rem;
+      margin-bottom: 0.3rem;
+      display: block;
+    }
+    .prompt-btn .prompt-text {
+      font-size: 0.8rem;
+      display: block;
+    }
+  </style>
 </head>
-<html>
-
 <body>
-  <main>
-    <div class="px-4 py-3 my-2 text-center">
-      <img class="d-block mx-auto mb-4" src="{{ url_for('static', path='images/azure-icon.svg') }}" alt="Azure Logo"
-        width="192" height="192" />
-      <h1 class="display-6 fw-bold text-primary">Welcome to Azure</h1>
+  <div id="chat-container" class="container-fluid"></div>
+  <div id="loading-spinner">
+    <div class="spinner-border text-success" role="status">
+      <span class="visually-hidden">Loading...</span>
     </div>
-    <form method="post" action="{{ url_for('hello')}}">
-      <div class="col-md-6 mx-auto text-center">
-        <label for="name" class="form-label fw-bold fs-5">Could you please tell me your name?</label>
-        <div class="d-grid gap-2 d-sm-flex justify-content-sm-center align-items-center my-1">
-          <input type="text" class="form-control" id="name" name="name" style="max-width: 256px;">
-        </div>
-        <div class="d-grid gap-2 d-sm-flex justify-content-sm-center my-2">
-          <button type="submit" class="btn btn-primary btn-lg px-4 gap-3">Say Hello</button>
-        </div>
-      </div>
-    </form>
-  </main>
-</body>
+  </div>
+  <div id="suggested-prompts" class="container-fluid p-2"></div>
+  <div id="input-container" class="container-fluid">
+    <input type="text" id="user-input" class="form-control" placeholder="Type your message..." />
+    <button id="send-button" class="btn btn-primary">Send</button>
+  </div>
+  <script>
+    const endpoint = "{{ AZURE_OPENAI_ENDPOINT }}";
+    const apiKey = "{{ AZURE_OPENAI_API_KEY }}";
+    const model = "{{ AZURE_OPENAI_MODEL }}";
 
+    const chatContainer = document.getElementById('chat-container');
+    const userInput = document.getElementById('user-input');
+    const sendButton = document.getElementById('send-button');
+    const spinner = document.getElementById('loading-spinner');
+    const conversationHistory = [];
+
+	function appendMessage(text, sender) {
+	  const messageDiv = document.createElement('div');
+	  messageDiv.className = `message ${sender}`;
+
+	  if (sender === 'bot') {
+		const rawHTML = DOMPurify.sanitize(marked.parse(text));
+
+		const twoColDiv = document.createElement('div');
+		twoColDiv.className = 'two-column';
+		twoColDiv.innerHTML = rawHTML;
+
+		messageDiv.appendChild(twoColDiv);
+
+		messageDiv.querySelectorAll('.clickable-phrase, strong').forEach(span => {
+		  span.addEventListener('click', () => {
+			userInput.value = span.textContent;
+			sendMessage();
+		  });
+		});
+	  } else {
+		messageDiv.textContent = text;
+	  }
+
+	  chatContainer.appendChild(messageDiv);
+	  chatContainer.scrollTop = chatContainer.scrollHeight;
+	}
+
+    function simpleHash(conversationHistory) {
+      let key = conversationHistory.filter((_, i) => i % 2 === 1).map(e => e.content).join(' | ')
+      let hash = 0;
+      for (let i = 0; i < key.length; i++) {
+        hash = ((hash << 5) - hash) + key.charCodeAt(i);
+        hash |= 0;
+      }
+      return Math.abs(hash).toString(36).padStart(6, '0').slice(0, 6);
+    }
+
+    async function sendMessage() {
+      const prompt = userInput.value.trim();
+      if (!prompt) return;
+
+      appendMessage(prompt, 'user');
+      conversationHistory.push({ role: 'user', content: prompt });
+      userInput.value = '';
+      spinner.style.display = 'block';
+
+      let cacheKey = simpleHash(conversationHistory);
+      let doFetch = true;
+      try {
+        const loadResponse = await fetch(`/load-conversation?filename=${cacheKey}`);
+        if (loadResponse.ok) {
+          const loaded = await loadResponse.json();
+          if (loaded.data) {
+            // Replace conversationHistory with the loaded data
+            conversationHistory.length = 0;
+            loaded.data.forEach(item => conversationHistory.push(item));
+            console.log(loaded.data);
+            doFetch = false;
+          }
+        }
+      } catch (e) {
+        console.warn('No previous conversation found for cacheKey:', cacheKey);
+      }
+
+      console.log(cacheKey);
+      if (doFetch) try {
+        console.log(1.1);
+        const response = await fetch(`${endpoint}/openai/deployments/${model}/chat/completions?api-version=2025-01-01-preview`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'api-key': apiKey
+          },
+          body: JSON.stringify({
+            messages: conversationHistory,
+            temperature: 0.7
+          })
+        });
+
+        const data = await response.json();
+        const reply = data.choices?.[0]?.message?.content || 'No response';
+        // appendMessage(reply, 'bot');
+        conversationHistory.push({ role: 'assistant', content: reply });
+
+        try {
+          await fetch('/save-conversation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename: cacheKey, data: conversationHistory })
+          });
+        } catch (e) {
+          console.warn('Could not save conversation:', e);
+        }
+
+      } catch (error) {
+        appendMessage('Error: ' + error.message, 'bot');
+      }
+      appendMessage(conversationHistory[conversationHistory.length - 1].content, 'bot');
+      spinner.style.display = 'none';
+    }
+
+    sendButton.addEventListener('click', sendMessage);
+    userInput.addEventListener('keypress', e => {
+      if (e.key === 'Enter') sendMessage();
+    });
+
+	async function loadPrompts() {
+      const response = await fetch('/static/prompts.yaml');
+      const yamlText = await response.text();
+      const yamlData = jsyaml.load(yamlText);
+      const prompts = yamlData.prompts || [];
+
+      if (yamlData.instructions) {
+        conversationHistory.push({ role: 'system', content: yamlData.instructions });
+      }
+
+      const container = document.getElementById('suggested-prompts');
+      container.innerHTML = `
+        <div style="width:100%;text-align:center;margin-bottom:2rem;">
+          <h1>&nbsp;</h1>
+          <h1>&nbsp;</h1>
+          <h1><strong>${yamlData.header}</strong></h1>
+          <h1>&nbsp;</h1>
+          <div class="prompt-grid"></div>
+          <h1>&nbsp;</h1>
+          <h1>&nbsp;</h1>
+        </div>
+      `;
+      const grid = container.querySelector('.prompt-grid');
+      prompts.forEach(({ display, prompt }) => {
+        if (display && prompt) {
+          const button = document.createElement('button');
+          button.className = 'btn btn-outline-secondary prompt-btn';
+          button.innerHTML = `
+            <span class="prompt-text"><strong>${display}</strong></span>
+            <span>${prompt}</span>
+          `;
+          button.addEventListener('click', () => {
+            container.style.display = 'none'; // Hide all prompt buttons
+            userInput.value = prompt.replace(/ <br> /g, ' ');
+            sendMessage();
+          });
+          grid.appendChild(button);
+        }
+      });
+    }
+    window.addEventListener('DOMContentLoaded', loadPrompts);
+    
+  </script>
+</body>
 </html>

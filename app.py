@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, abort
+from flask import Flask, render_template, request, abort, json, jsonify
 from dotenv import load_dotenv
 from azure.identity import DefaultAzureCredential
 from azure.keyvault.secrets import SecretClient
@@ -8,35 +8,52 @@ load_dotenv()
 
 app = Flask(__name__)
 
-SECRET_NAME = "user-token"
-KEY_VAULT_NAME = os.getenv("AZURE_KEY_VAULT_NAME", "edm-coach-keyvault")
-
-# Initialize Azure Key Vault client
-vault_url = f"https://{KEY_VAULT_NAME}.vault.azure.net"
-credential = DefaultAzureCredential()
-secret_client = SecretClient(vault_url=vault_url, credential=credential)
-EXPECTED_VALUE = secret_client.get_secret(SECRET_NAME).value
-
-@app.before_request
-def check_cookie():
-    if request.cookies.get(SECRET_NAME) is None:
-        request.user_token = "UNSET"
-    else:
-        request.user_token = request.cookies.get(SECRET_NAME)
-
 @app.after_request
 def set_cookie_if_needed(response):
     response.set_cookie("ip_address", request.headers.get('X-Forwarded-For', request.remote_addr), path="/")
-    if getattr(request, 'user_token', None) == "UNSET":
-        response.set_cookie(SECRET_NAME, "UNSET", path="/")
-    if getattr(request, 'user_token', None) != EXPECTED_VALUE:
-        abort(403)  # Forbidden
     return response
 
 @app.route("/")
 def index():
+    return render_template("index.html",
+        AZURE_OPENAI_ENDPOINT=os.getenv("AZURE_OPENAI_ENDPOINT"),
+        AZURE_OPENAI_API_KEY=os.getenv("AZURE_OPENAI_API_KEY"),
+        AZURE_OPENAI_MODEL=os.getenv("AZURE_OPENAI_MODEL")
+    )
+
+@app.route("/chat")
+def chat():
     return render_template("chat.html",
         AZURE_OPENAI_ENDPOINT=os.getenv("AZURE_OPENAI_ENDPOINT"),
         AZURE_OPENAI_API_KEY=os.getenv("AZURE_OPENAI_API_KEY"),
         AZURE_OPENAI_MODEL=os.getenv("AZURE_OPENAI_MODEL")
     )
+
+@app.route('/load-conversation', methods=['GET'])
+def load_conversation():
+    filename = request.args.get('filename')
+    if not filename:
+        return jsonify({'error': 'No filename provided'}), 400
+
+    file_path = f'cache/{filename}.json'
+    if os.path.exists(file_path):
+        try:
+            with open(file_path, 'r') as f:
+                conversation = json.load(f)
+            return jsonify({'data': conversation}), 200
+        except Exception as e:
+            return jsonify({'error': 'Failed to load conversation', 'details': str(e)}), 500
+    else:
+        return jsonify({'data': None}), 200
+
+@app.route('/save-conversation', methods=['POST'])
+def save_conversation():
+    data = request.get_json()
+    filename = data.get('filename')
+    conversation_data = data.get('data')
+    # Your logic here to save the conversation (e.g., to a file or database)
+    # For example, saving to a file:
+    with open(f'cache/{filename}.json', 'w') as f:
+        import json
+        json.dump(conversation_data, f)
+    return jsonify({"status": "saved"}), 200

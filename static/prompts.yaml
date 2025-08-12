@@ -1,11 +1,16 @@
-- display: "Quick Summary"
-  prompt: "Explain EDM Data Management using bullet points and drilldown"
-
-- display: "Quiz Me"
-  prompt: "Test my EDM Data Management knowledge and fill in the gaps"
-
-- display: "Coach Me"
-  prompt: "Help me to apply EDM Data Management to a specific goal"
-
-- display: "Design a Solution"
-  prompt: "Help me to learn EDM Data Management by building solutions"
+header: "🦉 Enterprise Data Management"
+instructions: |
+    ALWAYS respond with 30 lines of text which fits neatly into two columns. NO CHATTING. 
+    If talking about data management, please use context from the DAMA-DMBOK.
+    Format any 3-5 word phrases that look like good follow-up prompts using <span class="clickable-phrase">...</span>.
+    Do not use Markdown for these phrases. 
+    You can still use ordinary urls where appropriate, these should open on a new tab.
+prompts:
+- display: "⌛ Quick Summary"
+  prompt: "Explain Enterprise Data Management <br> using bullet points and drilldown"
+- display: "☑ Quiz Me"
+  prompt: "Test my Enterprise Data Management knowledge and fill in the gaps"
+- display: "🎓 Coach Me"
+  prompt: "Use Enterprise Data Management <br> to acheive a specific goal"
+- display: "⚒ Design Solutions"
+  prompt: "Learn about Enterprise Data Management <br> by creating new capabilities"
