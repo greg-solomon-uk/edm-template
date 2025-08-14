@@ -13,20 +13,25 @@ def set_cookie_if_needed(response):
     response.set_cookie("ip_address", request.headers.get('X-Forwarded-For', request.remote_addr), path="/")
     return response
 
+def list_yaml_files():
+    yaml_files = []
+    static_folder = os.path.join(app.root_path, 'static')
+    for root, dirs, files in os.walk(static_folder):
+        for file in files:
+            if file.endswith('.yaml'):
+                # Get path relative to the project root
+                # relative_path = os.path.relpath(os.path.join(root, file), app.root_path)
+                yaml_files.append(file)
+    return yaml_files
+
 @app.route("/")
 def index():
+    yaml_files = list_yaml_files()
     return render_template("index.html",
         AZURE_OPENAI_ENDPOINT=os.getenv("AZURE_OPENAI_ENDPOINT"),
         AZURE_OPENAI_API_KEY=os.getenv("AZURE_OPENAI_API_KEY"),
-        AZURE_OPENAI_MODEL=os.getenv("AZURE_OPENAI_MODEL")
-    )
-
-@app.route("/chat")
-def chat():
-    return render_template("chat.html",
-        AZURE_OPENAI_ENDPOINT=os.getenv("AZURE_OPENAI_ENDPOINT"),
-        AZURE_OPENAI_API_KEY=os.getenv("AZURE_OPENAI_API_KEY"),
-        AZURE_OPENAI_MODEL=os.getenv("AZURE_OPENAI_MODEL")
+        AZURE_OPENAI_MODEL=os.getenv("AZURE_OPENAI_MODEL"), 
+        YAML_FILES=yaml_files
     )
 
 @app.route('/load-conversation', methods=['GET'])
@@ -48,6 +53,7 @@ def load_conversation():
 
 @app.route('/save-conversation', methods=['POST'])
 def save_conversation():
+    return jsonify({"status": "saved"}), 200
     data = request.get_json()
     filename = data.get('filename')
     conversation_data = data.get('data')
