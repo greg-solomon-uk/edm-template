@@ -141,7 +141,7 @@
         hash = ((hash << 5) - hash) + key.charCodeAt(i);
         hash |= 0;
       }
-      return Math.abs(hash).toString(36).padStart(6, '0').slice(0, 6);
+      return Math.abs(hash).toString(36).padStart(6, '0').slice(0, 6) + '-' + key.split("|").pop();
     }
 
     async function sendMessage() {

@@ -57,8 +57,6 @@ def save_conversation():
     data = request.get_json()
     filename = data.get('filename')
     conversation_data = data.get('data')
-    # Your logic here to save the conversation (e.g., to a file or database)
-    # For example, saving to a file:
     with open(f'cache/{filename}.json', 'w') as f:
         import json
         json.dump(conversation_data, f)
