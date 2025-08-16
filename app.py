@@ -22,7 +22,7 @@ def list_yaml_files():
                 # Get path relative to the project root
                 # relative_path = os.path.relpath(os.path.join(root, file), app.root_path)
                 yaml_files.append(file)
-    return yaml_files
+    return sorted(yaml_files)
 
 @app.route("/")
 def index():
