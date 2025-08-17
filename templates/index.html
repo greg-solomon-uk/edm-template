@@ -135,7 +135,10 @@
     }
 
     function simpleHash(conversationHistory) {
-      let key = conversationHistory.filter((_, i) => i % 2 === 1).map(e => e.content).join(' | ');
+      let key = conversationHistory
+        .filter((e, i) => e.role == 'user')
+        .map(e => e.content)
+        .join(' | ');
       let hash = 0;
       for (let i = 0; i < key.length; i++) {
         hash = ((hash << 5) - hash) + key.charCodeAt(i);
@@ -144,12 +147,17 @@
       return Math.abs(hash).toString(36).padStart(6, '0').slice(0, 6) + '-' + key.split("|").pop().replace(/:/g, "");
     }
 
-    async function sendMessage() {
+    async function sendMessage(instructions = '') {
+      console.log("> sendMessage.instructions");
+      console.log(instructions);
       const prompt = userInput.value.trim();
       if (!prompt) return;
       document.getElementById("yaml-selector-container").style.display = "none";
       appendMessage(prompt, 'user');
       conversationHistory.push({ role: 'user', content: prompt });
+      conversationHistory.push({ role: 'system', content: instructions });
+      console.log("> sendMessage.conversationHistory");
+      console.log(conversationHistory);
       userInput.value = '';
       spinner.style.display = 'block';
 
@@ -163,6 +171,7 @@
             // Replace conversationHistory with the loaded data
             conversationHistory.length = 0;
             loaded.data.forEach(item => conversationHistory.push(item));
+            console.log('> sendMessage.loaded.data');
             console.log(loaded.data);
             doFetch = false;
           }
@@ -171,9 +180,9 @@
         console.warn('No previous conversation found for cacheKey:', cacheKey);
       }
 
+      console.log('> sendMessage.cacheKey');
       console.log(cacheKey);
       if (doFetch) try {
-        console.log(1.1);
         const response = await fetch(`${endpoint}/openai/deployments/${model}/chat/completions?api-version=2025-01-01-preview`, {
           method: 'POST',
           headers: {
@@ -238,7 +247,7 @@
         </div>
       `;
       const grid = container.querySelector('.prompt-grid');
-      prompts.forEach(({ display, prompt }) => {
+      prompts.forEach(({ display, prompt, instructions }) => {
         if (display && prompt) {
           const button = document.createElement('button');
           button.className = 'btn btn-outline-secondary prompt-btn';
@@ -249,7 +258,8 @@
           button.addEventListener('click', () => {
             container.style.display = 'none'; // Hide all prompt buttons
             userInput.value = prompt.replace(/ <br> /g, ' ');
-            sendMessage();
+            if (instructions) instructions = instructions ? `\n\n${instructions}` : '';
+            sendMessage(instructions);
           });
           grid.appendChild(button);
         }
