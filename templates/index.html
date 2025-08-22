@@ -34,56 +34,25 @@
     .bot { text-align: left; color: #198754; }
     #loading-spinner { display: none; text-align: center; padding: 1rem; }
     .clickable-phrase { font-weight: bold; text-decoration: underline; cursor: pointer; color: #198754; }
-    #suggested-prompts {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 60vh;
-    }
-    .prompt-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      grid-template-rows: 1fr 1fr;
-      gap: 2.5rem;
-      width: 900px;
-      max-width: 98vw;
-      margin: 0 auto;
-    }
-    .prompt-btn {
-      font-size: 1.2rem;
-      width: '25%' !important;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      border-radius: 32px;
-      box-shadow: 0 4px 24px #0002;
-      text-align: center;
-      transition: background 0.2s;
-      background: #fff;
-      padding: 1rem 1rem;
-      white-space: normal;
-      word-break: break-word;
-    }
-    .prompt-btn strong {
-      font-size: 1.2rem;
-      margin-bottom: 0.3rem;
-      display: block;
-    }
-    .prompt-btn .prompt-text {
-      font-size: 0.8rem;
-      display: block;
-    }
+    #suggested-prompts { display: flex; justify-content: center; align-items: center; min-height: 60vh; }
+    .prompt-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+                   gap: 2.5rem; width: 900px; max-width: 98vw; margin: 0 auto; }
+    .prompt-btn { font-size: 1.2rem; width: '25%' !important; display: flex; flex-direction: column;
+      justify-content: center; align-items: center; border-radius: 32px; box-shadow: 0 4px 24px #0002;
+      text-align: center; transition: background 0.2s; background: #fff; padding: 1rem 1rem;
+      white-space: normal; word-break: break-word; }
+    .prompt-btn strong { font-size: 1.2rem; margin-bottom: 0.3rem; display: block; }
+    .prompt-btn .prompt-text { font-size: 0.8rem; display: block; }
   </style>
 </head>
 <body>
+  
   <div id="chat-container" class="container-fluid"></div>
   <div id="loading-spinner">
     <div class="spinner-border text-success" role="status">
       <span class="visually-hidden">Loading...</span>
     </div>
   </div>
-  <!-- New YAML file selector -->
   <div id="yaml-selector-container" style="padding: 1rem;">
     <select id="yaml-selector" class="form-select" style="width: auto; min-width: 120px; display: inline-block;"></select>
   </div>
@@ -92,12 +61,12 @@
     <input type="text" id="user-input" class="form-control" placeholder="Type your message..." />
     <button id="send-button" class="btn btn-primary">Send</button>
   </div>
+
   <script>
     const endpoint = "{{ AZURE_OPENAI_ENDPOINT }}";
     const apiKey = "{{ AZURE_OPENAI_API_KEY }}";
     const model = "{{ AZURE_OPENAI_MODEL }}";
     const yamlFiles = {{ YAML_FILES | tojson }};
-
     const chatContainer = document.getElementById('chat-container');
     const userInput = document.getElementById('user-input');
     const sendButton = document.getElementById('send-button');
@@ -107,19 +76,16 @@
     function appendMessage(text, sender) {
       const messageDiv = document.createElement('div');
       messageDiv.className = `message ${sender}`;
-
       if (sender === 'bot') {
         const rawHTML = DOMPurify.sanitize(marked.parse(text));
         const lineCount = rawHTML.split(/<br\s*\/?>|\n|<p>|<li>|<h[1-6]>/i).length;
-
+        console.log('> appendMessage.lineCount', lineCount);
         const twoColDiv = document.createElement('div');
-        if (lineCount > 15) {
+        if (lineCount > 40) {
           twoColDiv.className = 'two-column';
         }
         twoColDiv.innerHTML = rawHTML;
-
         messageDiv.appendChild(twoColDiv);
-
         messageDiv.querySelectorAll('.clickable-phrase, strong').forEach(span => {
           span.addEventListener('click', () => {
             userInput.value = span.textContent;
@@ -129,7 +95,6 @@
       } else {
         messageDiv.textContent = text;
       }
-
       chatContainer.appendChild(messageDiv);
       chatContainer.scrollTop = chatContainer.scrollHeight;
     }
@@ -160,7 +125,6 @@
       console.log(conversationHistory);
       userInput.value = '';
       spinner.style.display = 'block';
-
       let cacheKey = simpleHash(conversationHistory);
       let doFetch = true;
       try {
@@ -179,7 +143,6 @@
       } catch (e) {
         console.warn('No previous conversation found for cacheKey:', cacheKey);
       }
-
       console.log('> sendMessage.cacheKey');
       console.log(cacheKey);
       if (doFetch) try {
@@ -194,11 +157,9 @@
             temperature: 0.7
           })
         });
-
         const data = await response.json();
         const reply = data.choices?.[0]?.message?.content || 'No response';
         conversationHistory.push({ role: 'assistant', content: reply });
-
         try {
           await fetch('/save-conversation', {
             method: 'POST',
@@ -208,14 +169,12 @@
         } catch (e) {
           console.warn('Could not save conversation:', e);
         }
-
       } catch (error) {
         appendMessage('Error: ' + error.message, 'bot');
       }
       appendMessage(conversationHistory[conversationHistory.length - 1].content, 'bot');
       spinner.style.display = 'none';
     }
-
     sendButton.addEventListener('click', sendMessage);
     userInput.addEventListener('keypress', e => {
       if (e.key === 'Enter') sendMessage();
@@ -228,12 +187,10 @@
       const yamlText = await response.text();
       const yamlData = jsyaml.load(yamlText);
       const prompts = yamlData.prompts || [];
-
       if (yamlData.instructions) {
         conversationHistory.length = 0;
         conversationHistory.push({ role: 'system', content: yamlData.instructions });
       }
-
       const container = document.getElementById('suggested-prompts');
       container.innerHTML = `
         <div style="width:100%;text-align:center;margin-bottom:2rem;">
@@ -265,7 +222,6 @@
         }
       });
     }
-
     window.addEventListener('DOMContentLoaded', () => {
       // Populate the YAML dropdown from the list provided by app.py
       const yamlSelector = document.getElementById('yaml-selector');
@@ -277,7 +233,6 @@
       });
       // Load prompts for the initially selected file
       loadPrompts();
-
       yamlSelector.addEventListener('change', loadPrompts);
     });
   </script>
