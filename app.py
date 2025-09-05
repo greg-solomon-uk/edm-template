@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from azure.identity import DefaultAzureCredential
 from azure.keyvault.secrets import SecretClient
 import os
+import re
 import requests
 
 load_dotenv()
@@ -32,40 +33,29 @@ def index():
         YAML_FILES=yaml_files
     )
 
-@app.route('/load-conversation', methods=['GET'])
-def load_conversation():
-    filename = request.args.get('filename')
-    if not filename:
-        return jsonify({'error': 'No filename provided'}), 400
-
-    file_path = f'cache/{filename}.json'
-    if os.path.exists(file_path):
-        try:
-            with open(file_path, 'r') as f:
-                conversation = json.load(f)
-            return jsonify({'data': conversation}), 200
-        except Exception as e:
-            return jsonify({'error': 'Failed to load conversation', 'details': str(e)}), 500
-    else:
-        return jsonify({'data': None}), 200
-
-@app.route('/save-conversation', methods=['POST'])
-def save_conversation():
-    # return jsonify({"status": "saved"}), 200
-    data = request.get_json()
-    filename = data.get('filename')
-    conversation_data = data.get('data')
-    with open(f'cache/{filename}.json', 'w') as f:
-        import json
-        json.dump(conversation_data, f)
-    return jsonify({"status": "saved"}), 200
-
-@app.route('/send-message', methods=['POST'])
-def send_message():
+@app.route('/get-response', methods=['POST'])
+def get_response():
     data = request.get_json()
     conversation_history = data.get('conversation_history', [])
+    new_path = []
+    for item in conversation_history:
+        if item.get('role') == 'user':
+            item = item.get('content')
+            item = re.sub(r'[^\w\d]+', '_', item)   # Replace non-alphanumeric characters with underscores
+            new_path.append(item)
+    os.makedirs(os.path.join('cache', *new_path[:-1]), exist_ok=True)
+    cache_path = os.path.join('cache', *new_path[:-1], new_path[-1] + '.json')
     instructions = data.get('instructions', '')
     
+    # Try to load from cache first
+    if os.path.exists(cache_path):
+        try:
+            with open(cache_path, 'r') as f:
+                return jsonify({'conversation_history': json.load(f)})
+        except Exception as e:
+            print(f"Cache read error: {str(e)}")
+    
+    # If no cache or cache read failed, generate new response
     if instructions:
         conversation_history.append({'role': 'system', 'content': instructions})
 
@@ -86,9 +76,15 @@ def send_message():
         reply = data.get('choices', [{}])[0].get('message', {}).get('content', 'No response')
         conversation_history.append({'role': 'assistant', 'content': reply})
         
-        return jsonify({
-            'reply': reply,
-            'conversation_history': conversation_history
-        })
+        # Save to cache
+        try:
+            os.makedirs('cache', exist_ok=True)
+            with open(cache_path, 'w') as f:
+                json.dump(conversation_history, f)
+        except Exception as e:
+            print(f"Cache write error: {str(e)}")
+
+        return jsonify({'conversation_history': conversation_history})
+    
     except Exception as e:
         return jsonify({'error': str(e)}), 500

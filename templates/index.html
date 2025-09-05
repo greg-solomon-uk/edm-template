@@ -37,7 +37,7 @@
     #suggested-prompts { display: flex; justify-content: center; align-items: center; min-height: 60vh; }
     .prompt-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
                    gap: 2.5rem; width: 900px; max-width: 98vw; margin: 0 auto; }
-    .prompt-btn { font-size: 1.2rem; width: '25%' !important; display: flex; flex-direction: column;
+    .prompt-btn { font-size: 1.2rem; width: '25%' !important; display: flex, flex-direction: column;
       justify-content: center; align-items: center; border-radius: 32px; box-shadow: 0 4px 24px #0002;
       text-align: center; transition: background 0.2s; background: #fff; padding: 1rem 1rem;
       white-space: normal; word-break: break-word; }
@@ -76,7 +76,6 @@
       if (sender === 'bot') {
         const rawHTML = DOMPurify.sanitize(marked.parse(text));
         const lineCount = rawHTML.split(/<br\s*\/?>|\n|<p>|<li>|<h[1-6]>/i).length;
-        console.log('> appendMessage.lineCount', lineCount);
         const twoColDiv = document.createElement('div');
         if (lineCount > 40) {
           twoColDiv.className = 'two-column';
@@ -148,29 +147,15 @@
       spinner.style.display = 'block';
       
       let cacheKey = simpleHash(conversationHistory);
-      let doFetch = true;
-      
-      try {
-        const loadResponse = await fetch(`/load-conversation?filename=${cacheKey}`);
-        if (loadResponse.ok) {
-          const loaded = await loadResponse.json();
-          if (loaded.data) {
-            // Update conversation history by creating a new array
-            conversationHistory = [...loaded.data];
-            doFetch = false;
-          }
-        }
-      } catch (e) {
-        console.warn('No previous conversation found for cacheKey:', cacheKey);
-      }
 
-      if (doFetch) try {
-        const response = await fetch('/send-message', {
+      try {
+        const response = await fetch('/get-response', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             conversation_history: conversationHistory,
-            instructions: instructions
+            instructions: instructions,
+            cache_key: cacheKey
           })
         });
         
@@ -178,17 +163,7 @@
         if (data.error) {
           appendMessage('Error: ' + data.error, 'bot');
         } else {
-          // Update conversation history by creating a new array
           conversationHistory = [...data.conversation_history];
-          try {
-            await fetch('/save-conversation', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ filename: cacheKey, data: conversationHistory })
-            });
-          } catch (e) {
-            console.warn('Could not save conversation:', e);
-          }
         }
       } catch (error) {
         appendMessage('Error: ' + error.message, 'bot');
