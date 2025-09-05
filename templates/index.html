@@ -63,15 +63,12 @@
   </div>
 
   <script>
-    const endpoint = "{{ AZURE_OPENAI_ENDPOINT }}";
-    const apiKey = "{{ AZURE_OPENAI_API_KEY }}";
-    const model = "{{ AZURE_OPENAI_MODEL }}";
     const yamlFiles = {{ YAML_FILES | tojson }};
     const chatContainer = document.getElementById('chat-container');
     const userInput = document.getElementById('user-input');
     const sendButton = document.getElementById('send-button');
     const spinner = document.getElementById('loading-spinner');
-    const conversationHistory = [];
+    let conversationHistory = [];  // Changed from const to let
 
     function appendMessage(text, sender) {
       const messageDiv = document.createElement('div');
@@ -92,6 +89,34 @@
             sendMessage();
           });
         });
+      } else if (sender === 'user') {
+        // Create a container for the user's message text.
+        const textSpan = document.createElement('span');
+        textSpan.textContent = text;
+        messageDiv.appendChild(textSpan);
+      
+        // Create an X button on the right-hand side.
+        const removeButton = document.createElement('button');
+        removeButton.textContent = 'X';
+        removeButton.style.position = 'absolute';
+        removeButton.style.right = '0';
+        removeButton.style.top = '0';
+        removeButton.style.border = 'none';
+        removeButton.style.background = 'transparent';
+        removeButton.style.cursor = 'pointer';
+        removeButton.style.fontWeight = 'bold';
+        removeButton.addEventListener('click', () => {
+          // Determine the index of this user message among all user messages.
+          const userMessages = Array.from(chatContainer.childNodes).filter(node => 
+            node.classList.contains('message') && node.classList.contains('user')
+          );
+          const index = userMessages.indexOf(messageDiv);
+          if (index !== -1) {
+            removeLastQA(index);
+          }
+        });
+        messageDiv.style.position = 'relative';
+        messageDiv.appendChild(removeButton);
       } else {
         messageDiv.textContent = text;
       }
@@ -113,65 +138,62 @@
     }
 
     async function sendMessage(instructions = '') {
-      console.log("> sendMessage.instructions");
-      console.log(instructions);
       const prompt = userInput.value.trim();
       if (!prompt) return;
+      
       document.getElementById("yaml-selector-container").style.display = "none";
       appendMessage(prompt, 'user');
       conversationHistory.push({ role: 'user', content: prompt });
-      conversationHistory.push({ role: 'system', content: instructions });
-      console.log("> sendMessage.conversationHistory");
-      console.log(conversationHistory);
       userInput.value = '';
       spinner.style.display = 'block';
+      
       let cacheKey = simpleHash(conversationHistory);
       let doFetch = true;
+      
       try {
         const loadResponse = await fetch(`/load-conversation?filename=${cacheKey}`);
         if (loadResponse.ok) {
           const loaded = await loadResponse.json();
           if (loaded.data) {
-            // Replace conversationHistory with the loaded data
-            conversationHistory.length = 0;
-            loaded.data.forEach(item => conversationHistory.push(item));
-            console.log('> sendMessage.loaded.data');
-            console.log(loaded.data);
+            // Update conversation history by creating a new array
+            conversationHistory = [...loaded.data];
             doFetch = false;
           }
         }
       } catch (e) {
         console.warn('No previous conversation found for cacheKey:', cacheKey);
       }
-      console.log('> sendMessage.cacheKey');
-      console.log(cacheKey);
+
       if (doFetch) try {
-        const response = await fetch(`${endpoint}/openai/deployments/${model}/chat/completions?api-version=2025-01-01-preview`, {
+        const response = await fetch('/send-message', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'api-key': apiKey
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            messages: conversationHistory,
-            temperature: 0.7
+            conversation_history: conversationHistory,
+            instructions: instructions
           })
         });
+        
         const data = await response.json();
-        const reply = data.choices?.[0]?.message?.content || 'No response';
-        conversationHistory.push({ role: 'assistant', content: reply });
-        try {
-          await fetch('/save-conversation', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ filename: cacheKey, data: conversationHistory })
-          });
-        } catch (e) {
-          console.warn('Could not save conversation:', e);
+        if (data.error) {
+          appendMessage('Error: ' + data.error, 'bot');
+        } else {
+          // Update conversation history by creating a new array
+          conversationHistory = [...data.conversation_history];
+          try {
+            await fetch('/save-conversation', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ filename: cacheKey, data: conversationHistory })
+            });
+          } catch (e) {
+            console.warn('Could not save conversation:', e);
+          }
         }
       } catch (error) {
         appendMessage('Error: ' + error.message, 'bot');
       }
+
       appendMessage(conversationHistory[conversationHistory.length - 1].content, 'bot');
       spinner.style.display = 'none';
     }
@@ -196,7 +218,7 @@
         <div style="width:100%;text-align:center;margin-bottom:2rem;">
           <h1>&nbsp;</h1>
           <h1>&nbsp;</h1>
-          <h1><strong>${yamlData.header}</strong></h1>
+          <h1>${yamlData.header}</h1>
           <h1>&nbsp;</h1>
           <div class="prompt-grid"></div>
           <h1>&nbsp;</h1>
@@ -209,7 +231,7 @@
           const button = document.createElement('button');
           button.className = 'btn btn-outline-secondary prompt-btn';
           button.innerHTML = `
-            <span class="prompt-text"><strong>${display}</strong></span>
+            <span class="prompt-text">${display}</span>
             <span>${prompt}</span>
           `;
           button.addEventListener('click', () => {
@@ -235,6 +257,70 @@
       loadPrompts();
       yamlSelector.addEventListener('change', loadPrompts);
     });
+
+    function removeLastQA(deleteQuestion) {
+      // If deleting the first question (index 0), refresh the page
+      if (deleteQuestion === 0) {
+        window.location.reload();
+        return;
+      }
+
+      // Remove entries from conversationHistory
+      let userCount = 0;
+      let startIndex = -1;
+      for (let i = 0; i < conversationHistory.length; i++) {
+        if (conversationHistory[i].role === 'user') {
+          if (userCount === deleteQuestion) {
+            startIndex = i;
+            break;
+          }
+          userCount++;
+        }
+      }
+      if (startIndex !== -1) {
+        conversationHistory.splice(startIndex);
+      }
+      
+      // Update chatContainer
+      const pairsToKeep = deleteQuestion;
+      while (chatContainer.childNodes.length > pairsToKeep * 2) {
+        chatContainer.removeChild(chatContainer.lastChild);
+      }
+    }
+
+    // Helper function that waits until the spinner becomes visible and then hides
+    function waitForSpinnerCycle() {
+      return new Promise(resolve => {
+        const checkVisible = setInterval(() => {
+          if (spinner.style.display === 'block') {
+            clearInterval(checkVisible);
+            const checkHidden = setInterval(() => {
+              if (spinner.style.display === 'none') {
+                clearInterval(checkHidden);
+                resolve();
+              }
+            }, 100);
+          }
+        }, 100);
+      });
+    }
+
+    async function doCache() {
+      // Grab a static array of clickable elements.
+      const clickables = Array.from(document.querySelectorAll('.clickable-phrase, .message.bot strong'));
+      for (let clickable of clickables) {
+        // Simulate a click on the clickable element.
+        clickable.click();
+        // Wait until spinner shows and then disappears.
+        await waitForSpinnerCycle();
+        // Determine the number of user messages (each representing one Q/A pair)
+        const userMessages = conversationHistory.filter(entry => entry.role === 'user');
+        const lastIndex = userMessages.length - 1;
+        // Remove the last Q/A pair.
+        removeLastQA(lastIndex);
+      }
+    }
+
   </script>
 </body>
 </html>

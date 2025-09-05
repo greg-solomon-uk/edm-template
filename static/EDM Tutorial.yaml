@@ -12,6 +12,6 @@ prompts:
 - display: "☑ Quiz Me"
   prompt: "Test my Enterprise Data Management knowledge and fill in the gaps"
 - display: "🎓 Coach Me"
-  prompt: "Use Enterprise Data Management <br> to acheive a specific goal"
+  prompt: "Use Enterprise Data Management <br> to achieve a specific goal"
 - display: "⚒ Design Solutions"
   prompt: "Learn about Enterprise Data Management <br> by creating new capabilities"
