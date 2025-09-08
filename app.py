@@ -5,15 +5,11 @@ from azure.keyvault.secrets import SecretClient
 import os
 import re
 import requests
+import litellm
 
 load_dotenv()
 
 app = Flask(__name__)
-
-@app.after_request
-def set_cookie_if_needed(response):
-    response.set_cookie("ip_address", request.headers.get('X-Forwarded-For', request.remote_addr), path="/")
-    return response
 
 def list_yaml_files():
     yaml_files = []
@@ -21,8 +17,6 @@ def list_yaml_files():
     for root, dirs, files in os.walk(static_folder):
         for file in files:
             if file.endswith('.yaml'):
-                # Get path relative to the project root
-                # relative_path = os.path.relpath(os.path.join(root, file), app.root_path)
                 yaml_files.append(file)
     return sorted(yaml_files)
 
@@ -60,18 +54,13 @@ def get_response():
         conversation_history.append({'role': 'system', 'content': instructions})
 
     try:
-        response = requests.post(
-            f"{os.getenv('AZURE_OPENAI_ENDPOINT')}/openai/deployments/{os.getenv('AZURE_OPENAI_MODEL')}/chat/completions?api-version=2025-01-01-preview",
-            headers={
-                'Content-Type': 'application/json',
-                'api-key': os.getenv('AZURE_OPENAI_API_KEY')
-            },
-            json={
-                'messages': conversation_history,
-                'temperature': 0.7
-            }
+        litellm.api_base = "https://openai.generative.engine.capgemini.com/v1"
+
+        response = litellm.completion(
+            model = "openai/openai.gpt-4o",
+            messages = conversation_history
         )
-        
+
         data = response.json()
         reply = data.get('choices', [{}])[0].get('message', {}).get('content', 'No response')
         conversation_history.append({'role': 'assistant', 'content': reply})
