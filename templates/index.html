@@ -140,6 +140,13 @@
       const prompt = userInput.value.trim();
       if (!prompt) return;
       
+      // Get all localStorage values as a dictionary
+      const storageData = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        storageData[key] = localStorage.getItem(key);
+      }
+      
       document.getElementById("yaml-selector-container").style.display = "none";
       appendMessage(prompt, 'user');
       conversationHistory.push({ role: 'user', content: prompt });
@@ -155,7 +162,8 @@
           body: JSON.stringify({
             conversation_history: conversationHistory,
             instructions: instructions,
-            cache_key: cacheKey
+            cache_key: cacheKey,
+            storage: storageData
           })
         });
         

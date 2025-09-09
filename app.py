@@ -31,6 +31,7 @@ def index():
 def get_response():
     data = request.get_json()
     conversation_history = data.get('conversation_history', [])
+    storage = data.get('storage', {})  # Get storage values from request
     new_path = []
     for item in conversation_history:
         if item.get('role') == 'user':
@@ -55,6 +56,14 @@ def get_response():
 
     try:
         litellm.api_base = "https://openai.generative.engine.capgemini.com/v1"
+
+        if 'OPENAI_API_KEY' in storage:
+            litellm.api_key = storage['OPENAI_API_KEY']
+
+        # Add storage context to the conversation
+        if storage:
+            storage_context = "Local storage values:\n" + "\n".join([f"{k}: {v}" for k, v in storage.items()])
+            conversation_history.append({'role': 'system', 'content': storage_context})
 
         response = litellm.completion(
             model = "openai/openai.gpt-4o",
